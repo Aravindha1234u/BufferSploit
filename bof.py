@@ -88,6 +88,13 @@ def send_badchars():
     sendPayload(str(buffer))
 
 def remove_badchars(badchar):
+    try:
+        open('badchar.txt', 'r')
+    except FileNotFoundError:
+        with open('badchar.txt', 'w') as f:
+            f.write(r"\x00,")
+            f.close()
+    
     import itertools    
     new_badchar = [i for i in badcharlist]
     hex_digits = ["".join(i) for i in itertools.product("0123456789ABCDEF",repeat=2)][1:]
